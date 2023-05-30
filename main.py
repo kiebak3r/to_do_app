@@ -19,7 +19,7 @@ class Task(f.UserControl):
         return f'{uk_date_time} \U0001F44A'
 
     def wrap_label(self, label):
-        wrapper = textwrap.TextWrapper(width=70)
+        wrapper = textwrap.TextWrapper(width=90)
         wrapped_text = wrapper.fill(text=self.task_name)
         return wrapped_text
 
@@ -30,8 +30,8 @@ class Task(f.UserControl):
             value=False,
             label=wrapped_label,
             on_change=self.status_changed,
-            tooltip='Complete'
         )
+
         self.edit_name = f.TextField(
             expand=1,
             multiline=True,
@@ -85,7 +85,8 @@ class Task(f.UserControl):
         self.update()
 
     def save_clicked(self, e):
-        self.display_task.label = self.wrap_label(self.edit_name.value)
+        self.task_name = self.edit_name.value
+        self.display_task.label = self.wrap_label(self.task_name)
         self.display_view.visible = True
         self.edit_view.visible = False
         self.update()
@@ -95,7 +96,7 @@ class Task(f.UserControl):
         self.completed = self.display_task.value
         if self.completed:
             timestamp = self.get_time_stamp()
-            self.display_task.label = f"{self.wrap_label(self.task_name)} \U00002796 Completed on {timestamp}"
+            self.display_task.label = f"{self.wrap_label(self.task_name)} \n \U00002796 Completed on {timestamp}"
         else:
             self.display_task.label = self.wrap_label(self.task_name)
         self.update()
@@ -108,23 +109,25 @@ class Task(f.UserControl):
 class TodoApp(f.UserControl):
     def __init__(self):
         super().__init__()
-        self.todo_title = "To Be Completed \U00002692"
-        self.no_items_prompt = f"Awaiting Tasks \U000023F3"
-        self.no_items_master_prompt = "\U0001F389 You have no tasks to complete."
+        self.todo_title = "My Tasks \U0001F4CB"
+        self.no_items_prompt = f"Awaiting New Tasks \U000023F3"
+        self.no_items_master_prompt = "\U0001F389 You have no new tasks to complete."
         self.no_completed_items_prompt = '\U0001F5D1 You have no completed tasks.'
         self.no_items_master = f.Text(self.no_items_master_prompt)
         self.items_left = f.Text(self.no_items_prompt)
         self.no_completed_items = f.Text(self.no_completed_items_prompt)
 
         self.dropdown = f.Dropdown(
-            label='...',
+            icon=f.icons.MORE_HORIZ,
             tooltip='Options',
+            alignment=f.alignment.center,
+            border_color="transparent",
             border_radius=20,
-            width=150,
+            width=60,
             on_change=self.dropdown_changed,
             options=[
-                f.dropdown.Option("Clear All"),
-                f.dropdown.Option("Export All"),
+                f.dropdown.Option("Clear All Tasks"),
+                f.dropdown.Option("Export All Tasks"),
             ],
         )
 
@@ -146,7 +149,7 @@ class TodoApp(f.UserControl):
         self.filter = f.Tabs(
             selected_index=0,
             on_change=self.tabs_changed,
-            tabs=[f.Tab(text="Active"), f.Tab(text="Completed")],
+            tabs=[f.Tab(text="Active Tasks"), f.Tab(text="Completed Tasks")],
         )
 
         self.update_button_visibility()
@@ -154,7 +157,7 @@ class TodoApp(f.UserControl):
 
         # application's root control (i.e. "view") containing all other controls
         return f.Column(
-            width=600,
+            width=800,
             controls=[
                 f.Row(
                     alignment="center",
@@ -163,6 +166,7 @@ class TodoApp(f.UserControl):
                     ],
                 ),
                 f.Row(
+                    width=750,
                     alignment="spaceBetween",
                     controls=[
                         f.Row(
@@ -253,7 +257,7 @@ class TodoApp(f.UserControl):
                 self.title.controls = [f.Text(value=self.todo_title, style="headlineMedium")]
 
             elif self.filter.selected_index == 1:
-                self.title.controls = [f.Text(value="Completed \U00002705", style="headlineMedium")]
+                self.title.controls = [f.Text(value="My Completed Tasks \U00002705", style="headlineMedium")]
 
         def refresh():
             self.fetch_completed_tasks()
@@ -280,12 +284,12 @@ class TodoApp(f.UserControl):
     def dropdown_changed(self, e):
         selected_value = self.dropdown.value
 
-        if selected_value == 'Export All':
+        if selected_value == 'Export All Tasks':
             for task in self.tasks.controls:
                 if task.completed:
                     self.show_completed_tasks(self.fetch_completed_tasks())
 
-        if selected_value == 'Clear All':
+        if selected_value == 'Clear All Tasks':
             self.clear_clicked(e)
 
         self.dropdown.value = None
@@ -301,17 +305,17 @@ class TodoApp(f.UserControl):
 
     @staticmethod
     def show_completed_tasks(func):
-        with open('completed_Tasks.txt', 'a', encoding='utf-8') as w:
+        with open('completeTasks.txt', 'a', encoding='utf-8') as w:
             for comp in func:
-                w.write(f'{comp} \n')
+                w.write(f'{comp} \n \n')
 
     def update(self):
         status = self.filter.tabs[self.filter.selected_index].text
         count = 0
         for task in self.tasks.controls:
             task.visible = (
-                status == "Active" and task.completed is False
-                or (status == "Completed" and task.completed)
+                status == "Active Tasks" and task.completed is False
+                or (status == "Completed Tasks" and task.completed)
             )
             if not task.completed:
                 count += 1
@@ -345,4 +349,4 @@ def main(page: f.Page):
     page.add(app)
 
 
-f.app(target=main)
+f.app(target=main, view=f.WEB_BROWSER)
