@@ -12,7 +12,8 @@ class Task(f.UserControl):
         self.task_status_change = task_status_change
         self.task_delete = task_delete
 
-    def get_time_stamp(self):
+    @staticmethod
+    def get_time_stamp():
         current_datetime = datetime.now()
         uk_date_time = current_datetime.strftime("%d/%m/%Y at %H:%M")
         return f'{uk_date_time} \U0001F44A'
@@ -246,6 +247,8 @@ class TodoApp(f.UserControl):
                 self.title.controls = [f.Text(value="Completed \U00002705", style="headlineMedium")]
 
         def refresh():
+            # self.show_completed_tasks(self.fetch_completed_tasks())  # add this to an export completed tasks button
+            self.fetch_completed_tasks()
             self.update_completed_tasks_prompt_visibility()
             self.update_active_count_master_visibility()
             self.update_input_visibility()
@@ -265,6 +268,20 @@ class TodoApp(f.UserControl):
         for task in self.tasks.controls[:]:
             if task.completed:
                 self.task_delete(task)
+
+    def fetch_completed_tasks(self):
+        completed_tasks = []
+        for task in self.tasks.controls:
+            if self.filter.selected_index == 1 and task.completed:
+                completed_tasks.append(task.display_task.label)
+
+        return completed_tasks
+
+    @staticmethod
+    def show_completed_tasks(func):
+        with open('completed_Tasks.txt', 'a', encoding='utf-8') as w:
+            for comp in func:
+                w.write(f'{comp} \n')
 
     def update(self):
         status = self.filter.tabs[self.filter.selected_index].text
