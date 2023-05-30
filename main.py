@@ -116,9 +116,18 @@ class TodoApp(f.UserControl):
         self.items_left = f.Text(self.no_items_prompt)
         self.no_completed_items = f.Text(self.no_completed_items_prompt)
 
-        self.clear_button = f.OutlinedButton(
-            text="Clear Completed Items", on_click=self.clear_clicked
+        self.dropdown = f.Dropdown(
+            label='...',
+            tooltip='Options',
+            border_radius=20,
+            width=150,
+            on_change=self.dropdown_changed,
+            options=[
+                f.dropdown.Option("Clear All"),
+                f.dropdown.Option("Export All"),
+            ],
         )
+
         self.new_task = f.TextField(
             on_submit=self.add_clicked,
             expand=True,
@@ -162,7 +171,7 @@ class TodoApp(f.UserControl):
                             ],
                         ),
                         self.items_left,
-                        self.clear_button,
+                        self.dropdown,
                     ],
                 ),
                 f.Row(
@@ -184,10 +193,10 @@ class TodoApp(f.UserControl):
 
     def update_button_visibility(self):
         if self.filter.selected_index == 0:
-            self.clear_button.visible = False
+            self.dropdown.visible = False
 
         elif self.filter.selected_index == 1:
-            self.clear_button.visible = True
+            self.dropdown.visible = True
 
     def update_active_count_visibility(self):
         if self.filter.selected_index == 0:
@@ -247,7 +256,6 @@ class TodoApp(f.UserControl):
                 self.title.controls = [f.Text(value="Completed \U00002705", style="headlineMedium")]
 
         def refresh():
-            # self.show_completed_tasks(self.fetch_completed_tasks())  # add this to an export completed tasks button
             self.fetch_completed_tasks()
             self.update_completed_tasks_prompt_visibility()
             self.update_active_count_master_visibility()
@@ -268,6 +276,20 @@ class TodoApp(f.UserControl):
         for task in self.tasks.controls[:]:
             if task.completed:
                 self.task_delete(task)
+
+    def dropdown_changed(self, e):
+        selected_value = self.dropdown.value
+
+        if selected_value == 'Export All':
+            for task in self.tasks.controls:
+                if task.completed:
+                    self.show_completed_tasks(self.fetch_completed_tasks())
+
+        if selected_value == 'Clear All':
+            self.clear_clicked(e)
+
+        self.dropdown.value = None
+        self.update()
 
     def fetch_completed_tasks(self):
         completed_tasks = []
