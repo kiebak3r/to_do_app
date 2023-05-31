@@ -345,6 +345,15 @@ class TodoApp(f.UserControl):
             for comp in func:
                 w.write(f'{comp} \n \n')
 
+    def load_tasks_from_database(self):
+        tasks = db.child("tasks").get().val()
+        if tasks:
+            for task_name, task_data in tasks.items():
+                task = Task(task_name, self.task_status_change, self.task_delete)
+                task.completed = task_data.get("completed", False)
+                self.tasks.controls.append(task)
+                self.update()
+
     def update(self):
         status = self.filter.tabs[self.filter.selected_index].text
         active_count = 0
@@ -365,9 +374,12 @@ class TodoApp(f.UserControl):
             if active_count == 0:
                 self.items_left.value = self.no_items_prompt
                 self.no_items_master.value = self.no_items_master_prompt
+
             elif active_count == 1:
                 self.items_left.value = f"{active_count} Active Task \U0001F4A5"
+
                 self.no_items_master.value = ''
+
             else:
                 self.items_left.value = f"{active_count} Active Tasks \U0001F525"
                 self.no_items_master.value = ''
@@ -375,6 +387,7 @@ class TodoApp(f.UserControl):
         elif status == "Completed Tasks":
             if completed_count == 0:
                 self.no_completed_items.visible = True
+
             else:
                 self.no_completed_items.visible = False
 
@@ -392,6 +405,7 @@ def main(page: f.Page):
 
     # add application's root control to the page
     page.add(app)
+    app.load_tasks_from_database()
 
 
 f.app(target=main, view=f.WEB_BROWSER)
