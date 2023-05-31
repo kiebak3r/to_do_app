@@ -2,6 +2,16 @@ import flet as f
 import time
 from datetime import datetime
 import textwrap
+import pyrebase
+import json
+
+# Load Firebase configuration from JSON file
+with open('firebaseServices.json') as config_file:
+    config = json.load(config_file)
+
+# Initialize Firebase app
+firebase = pyrebase.initialize_app(config)
+db = firebase.database()
 
 
 class Task(f.UserControl):
@@ -19,7 +29,7 @@ class Task(f.UserControl):
         return f'{uk_date_time} \U0001F44A'
 
     def wrap_label(self, label):
-        wrapper = textwrap.TextWrapper(width=90)
+        wrapper = textwrap.TextWrapper(width=67)
         wrapped_text = wrapper.fill(text=self.task_name)
         return wrapped_text
 
@@ -85,11 +95,17 @@ class Task(f.UserControl):
         self.update()
 
     def save_clicked(self, e):
-        self.task_name = self.edit_name.value
+        old_task_name = self.task_name
+        self.task_name = self.edit_name.value.replace(".", "")
         self.display_task.label = self.wrap_label(self.task_name)
         self.display_view.visible = True
         self.edit_view.visible = False
         self.update()
+
+        # Update the task name in the database
+        task_data = db.child("tasks").child(old_task_name).get().val()
+        db.child("tasks").child(old_task_name).remove()
+        db.child("tasks").child(self.task_name).set(task_data)
 
     def status_changed(self, e):
         time.sleep(.5)
@@ -97,10 +113,16 @@ class Task(f.UserControl):
         if self.completed:
             timestamp = self.get_time_stamp()
             self.display_task.label = f"{self.wrap_label(self.task_name)} \n \U00002796 Completed on {timestamp}"
+
+            # Updates the state in the database
+            db.child("tasks").child(self.task_name).update({"completed": True})
+
         else:
             self.display_task.label = self.wrap_label(self.task_name)
-        self.update()
+            db.child("tasks").child(self.task_name).update({"completed": False})
+
         self.task_status_change(self)
+        self.update()
 
     def delete_clicked(self, e):
         self.task_delete(self)
@@ -138,7 +160,7 @@ class TodoApp(f.UserControl):
             autofocus=True
         )
         self.add_button = (
-            f.FloatingActionButton(icon=f.icons.ADD, on_click=self.add_clicked)
+            f.FloatingActionButton(icon=f.icons.ADD, on_click=self.add_clicked, tooltip='Add Task')
         )
         self.title = f.Row(
             [f.Text(value=self.todo_title, style="headlineMedium")], alignment="center"
@@ -157,7 +179,7 @@ class TodoApp(f.UserControl):
 
         # application's root control (i.e. "view") containing all other controls
         return f.Column(
-            width=800,
+            width=600,
             controls=[
                 f.Row(
                     alignment="center",
@@ -166,7 +188,6 @@ class TodoApp(f.UserControl):
                     ],
                 ),
                 f.Row(
-                    width=750,
                     alignment="spaceBetween",
                     controls=[
                         f.Row(
@@ -236,12 +257,18 @@ class TodoApp(f.UserControl):
             self.add_button.visible = False
 
     def add_clicked(self, e):
-        if self.new_task.value:
-            task = Task(self.new_task.value, self.task_status_change, self.task_delete)
+        task_name = self.new_task.value.strip()
+
+        if task_name:
+            task_name = task_name.replace(".", "")
+            task = Task(task_name, self.task_status_change, self.task_delete)
             self.tasks.controls.append(task)
             self.new_task.value = ""
             self.new_task.focus()
             self.update()
+
+            # Adds to the database
+            db.child("tasks").child(task_name).set({"completed": False})
 
     def task_status_change(self, task):
         self.update()
@@ -250,6 +277,9 @@ class TodoApp(f.UserControl):
         self.tasks.controls.remove(task)
         self.update_completed_tasks_prompt_visibility()
         self.update()
+
+        # removes task from the database
+        db.child("tasks").child(task.task_name).remove()
 
     def tabs_changed(self, e):
         def update_title():
@@ -277,9 +307,15 @@ class TodoApp(f.UserControl):
             refresh()
 
     def clear_clicked(self, e):
+        completed_tasks = []
         for task in self.tasks.controls[:]:
             if task.completed:
+                completed_tasks.append(task)
                 self.task_delete(task)
+
+        # Remove all completed tasks from the database
+        for task in completed_tasks:
+            db.child("tasks").child(task.task_name).remove()
 
     def dropdown_changed(self, e):
         selected_value = self.dropdown.value
@@ -311,29 +347,38 @@ class TodoApp(f.UserControl):
 
     def update(self):
         status = self.filter.tabs[self.filter.selected_index].text
-        count = 0
+        active_count = 0
+        completed_count = 0
+
         for task in self.tasks.controls:
             task.visible = (
-                status == "Active Tasks" and task.completed is False
-                or (status == "Completed Tasks" and task.completed)
+                    status == "Active Tasks" and not task.completed
+                    or (status == "Completed Tasks" and task.completed)
             )
-            if not task.completed:
-                count += 1
 
-        if count == 0:
-            self.items_left.value = self.no_items_prompt
-            self.no_items_master.value = self.no_items_master_prompt
-            super().update()
+            if task.completed:
+                completed_count += 1
+            else:
+                active_count += 1
 
-        elif count == 1:
-            self.items_left.value = f"{count} Active Task \U0001F4A5"
-            self.no_items_master.value = ''
-            super().update()
+        if status == "Active Tasks":
+            if active_count == 0:
+                self.items_left.value = self.no_items_prompt
+                self.no_items_master.value = self.no_items_master_prompt
+            elif active_count == 1:
+                self.items_left.value = f"{active_count} Active Task \U0001F4A5"
+                self.no_items_master.value = ''
+            else:
+                self.items_left.value = f"{active_count} Active Tasks \U0001F525"
+                self.no_items_master.value = ''
 
-        else:
-            self.items_left.value = f"{count} Active Tasks \U0001F525"
-            self.no_items_master.value = ''
-            super().update()
+        elif status == "Completed Tasks":
+            if completed_count == 0:
+                self.no_completed_items.visible = True
+            else:
+                self.no_completed_items.visible = False
+
+        super().update()
 
 
 def main(page: f.Page):
