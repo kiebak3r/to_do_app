@@ -1,9 +1,6 @@
-import flet as f
-import time
+import flet as f, os, time, textwrap, pyrebase, json
 from datetime import datetime
-import textwrap
-import pyrebase
-import json
+
 
 # Load Firebase configuration from JSON file
 with open('firebaseServices.json') as config_file:
@@ -14,6 +11,12 @@ firebase = pyrebase.initialize_app(config)
 db = firebase.database()
 
 
+def get_time_stamp():
+    current_datetime = datetime.now()
+    uk_date_time = current_datetime.strftime("%d/%m/%Y at %H:%M")
+    return f'\U00002796 Completed on {uk_date_time} \U0001F44A'
+
+
 class Task(f.UserControl):
     def __init__(self, task_name, task_status_change, task_delete):
         super().__init__()
@@ -21,12 +24,6 @@ class Task(f.UserControl):
         self.task_name = task_name
         self.task_status_change = task_status_change
         self.task_delete = task_delete
-
-    @staticmethod
-    def get_time_stamp():
-        current_datetime = datetime.now()
-        uk_date_time = current_datetime.strftime("%d/%m/%Y at %H:%M")
-        return f'{uk_date_time} \U0001F44A'
 
     def wrap_label(self, label):
         wrapper = textwrap.TextWrapper(width=67)
@@ -111,15 +108,16 @@ class Task(f.UserControl):
         time.sleep(.5)
         self.completed = self.display_task.value
         if self.completed:
-            timestamp = self.get_time_stamp()
-            self.display_task.label = f"{self.wrap_label(self.task_name)} \n \U00002796 Completed on {timestamp}"
+            self.display_task.label = self.wrap_label(self.task_name)
 
             # Updates the state in the database
             db.child("tasks").child(self.task_name).update({"completed": True})
+            db.child("tasks").child(self.task_name).update({"completed_date": get_time_stamp()})
 
         else:
             self.display_task.label = self.wrap_label(self.task_name)
             db.child("tasks").child(self.task_name).update({"completed": False})
+            db.child("tasks").child(self.task_name).child("completed_date").remove()
 
         self.task_status_change(self)
         self.update()
@@ -290,7 +288,6 @@ class TodoApp(f.UserControl):
                 self.title.controls = [f.Text(value="My Completed Tasks \U00002705", style="headlineMedium")]
 
         def refresh():
-            self.fetch_completed_tasks()
             self.update_completed_tasks_prompt_visibility()
             self.update_active_count_master_visibility()
             self.update_input_visibility()
@@ -321,9 +318,7 @@ class TodoApp(f.UserControl):
         selected_value = self.dropdown.value
 
         if selected_value == 'Export All Tasks':
-            for task in self.tasks.controls:
-                if task.completed:
-                    self.show_completed_tasks(self.fetch_completed_tasks())
+            self.show_completed_tasks(self.fetch_completed_tasks())
 
         if selected_value == 'Clear All Tasks':
             self.clear_clicked(e)
@@ -331,19 +326,26 @@ class TodoApp(f.UserControl):
         self.dropdown.value = None
         self.update()
 
-    def fetch_completed_tasks(self):
+    @staticmethod
+    def fetch_completed_tasks():
         completed_tasks = []
-        for task in self.tasks.controls:
-            if self.filter.selected_index == 1 and task.completed:
-                completed_tasks.append(task.display_task.label)
+        tasks = db.child("tasks").get().val()
+
+        for task_name, task_data in tasks.items():
+            completed = task_data.get("completed", False)
+            if completed:
+                completed_date = task_data.get("completed_date")
+                task = f'{task_name}\n{completed_date}\n\n'
+                completed_tasks.append(task)
 
         return completed_tasks
 
     @staticmethod
     def show_completed_tasks(func):
-        with open('completeTasks.txt', 'a', encoding='utf-8') as w:
-            for comp in func:
-                w.write(f'{comp} \n \n')
+        output_file = 'completeTasks.txt'
+        with open(output_file, 'w', encoding='utf-8') as w:
+            for completed in func:
+                w.write(completed)
 
     def load_tasks_from_database(self):
         tasks = db.child("tasks").get().val()
