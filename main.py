@@ -10,11 +10,13 @@ with open('firebaseServices.json') as config_file:
 firebase = pyrebase.initialize_app(config)
 db = firebase.database()
 
+invalid_chars = ['/', '.', '$', '£', '#', '[', ']', '']
 
-def get_time_stamp():
+
+def get_time_stamp(status: str) -> str:
     current_datetime = datetime.now()
     uk_date_time = current_datetime.strftime("%d/%m/%Y at %H:%M")
-    return f'\U00002796 Completed on {uk_date_time} \U0001F44A'
+    return f'\U00002796 {status} on {uk_date_time} \U0001F44A'
 
 
 class Task(f.UserControl):
@@ -24,11 +26,38 @@ class Task(f.UserControl):
         self.task_name = task_name
         self.task_status_change = task_status_change
         self.task_delete = task_delete
+        self.dialog = None
 
     def wrap_label(self, label):
-        wrapper = textwrap.TextWrapper(width=67)
+        wrapper = textwrap.TextWrapper(width=60)
         wrapped_text = wrapper.fill(text=self.task_name)
         return wrapped_text
+
+    def show_details(self, e):
+        def close_dlg(e):
+            self.dialog.open = False
+            self.page.update()
+
+        task_data = db.child("tasks").child(self.task_name).get().val()
+        if task_data and task_data.get("completed"):
+            completed_date = task_data.get("completed_date")
+            alert_message = completed_date
+
+        else:
+            alert_message = task_data.get("added_date")
+
+        self.dialog = f.AlertDialog(
+            title=f.Text(alert_message),
+            actions=[
+                f.TextButton("Close", on_click=close_dlg),
+            ],
+            actions_alignment=f.MainAxisAlignment.END,
+            on_dismiss=lambda e: setattr(self, "dialog", None)
+        )
+
+        self.dialog.open = True
+        self.page.dialog = self.dialog
+        self.page.update()
 
     def build(self):
         wrapped_label = self.wrap_label(self.task_name)
@@ -64,6 +93,11 @@ class Task(f.UserControl):
                             tooltip="Delete",
                             on_click=self.delete_clicked,
                         ),
+                        f.IconButton(
+                            icon=f.icons.INFO_OUTLINED,
+                            tooltip='Details',
+                            on_click=self.show_details,
+                        ),
                     ],
                 ),
             ],
@@ -93,7 +127,11 @@ class Task(f.UserControl):
 
     def save_clicked(self, e):
         old_task_name = self.task_name
-        self.task_name = self.edit_name.value.replace(".", "")
+        self.task_name = self.edit_name.value
+
+        for char in invalid_chars:
+            self.task_name = self.task_name.replace(char, "")
+
         self.display_task.label = self.wrap_label(self.task_name)
         self.display_view.visible = True
         self.edit_view.visible = False
@@ -102,6 +140,7 @@ class Task(f.UserControl):
         # Update the task name in the database
         task_data = db.child("tasks").child(old_task_name).get().val()
         db.child("tasks").child(old_task_name).remove()
+        db.child("tasks").child(self.task_name).set(task_data)
         db.child("tasks").child(self.task_name).set(task_data)
 
     def status_changed(self, e):
@@ -112,7 +151,7 @@ class Task(f.UserControl):
 
             # Updates the state in the database
             db.child("tasks").child(self.task_name).update({"completed": True})
-            db.child("tasks").child(self.task_name).update({"completed_date": get_time_stamp()})
+            db.child("tasks").child(self.task_name).update({"completed_date": get_time_stamp('Completed')})
 
         else:
             self.display_task.label = self.wrap_label(self.task_name)
@@ -258,7 +297,9 @@ class TodoApp(f.UserControl):
         task_name = self.new_task.value.strip()
 
         if task_name:
-            task_name = task_name.replace(".", "")
+            for chars in invalid_chars:
+                task_name = task_name.replace(chars, "")
+
             task = Task(task_name, self.task_status_change, self.task_delete)
             self.tasks.controls.append(task)
             self.new_task.value = ""
@@ -266,7 +307,7 @@ class TodoApp(f.UserControl):
             self.update()
 
             # Adds to the database
-            db.child("tasks").child(task_name).set({"completed": False})
+            db.child("tasks").child(task_name).set({"completed": False, "added_date": get_time_stamp('Added')})
 
     def task_status_change(self, task):
         self.update()
@@ -399,7 +440,8 @@ class TodoApp(f.UserControl):
 def main(page: f.Page):
     page.title = "ToDo App"
     page.horizontal_alignment = "center"
-    page.scroll = "adaptive"
+    page.scroll = f.ScrollMode.ALWAYS
+    page.auto_scroll = True
     page.update()
 
     # create application instance
