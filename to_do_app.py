@@ -2,6 +2,7 @@ import subprocess
 import flet as f, os, time, textwrap, pyrebase, json, tempfile
 from datetime import datetime
 
+
 config = {
   "databaseURL": "https://todo-project-76b56-default-rtdb.firebaseio.com/",
   "apiKey": "AIzaSyCwsPBrk-5fwyT6f0h7geAHyf_lPuGTmAQ",
@@ -24,12 +25,13 @@ config = {
   "universe_domain": "googleapis.com"
 }
 
-
 # Initialize Firebase app
 firebase = pyrebase.initialize_app(config)
 db = firebase.database()
 
-invalid_chars = ['/', '.', '$', '£', '#', '[', ']', '']
+# Variables
+backup_old_task_name = ''
+invalid_chars = ['/', '.', '$', '£', '#', '[', ']']
 
 
 def get_time_stamp(status: str) -> str:
@@ -90,6 +92,7 @@ class Task(f.UserControl):
 
         self.edit_name = f.TextField(
             expand=1,
+            max_length=500,
             multiline=True,
             autofocus=True
         )
@@ -146,22 +149,51 @@ class Task(f.UserControl):
         self.update()
 
     def save_clicked(self, e):
-        old_task_name = self.task_name
-        self.task_name = self.edit_name.value
+        global backup_old_task_name
+        old_task_name = self.task_name.replace('\n', "").replace("\r", "").strip().capitalize()
+        self.task_name = self.edit_name.value.replace('\n', "").replace("\r", "").strip().capitalize()
 
         for char in invalid_chars:
             self.task_name = self.task_name.replace(char, "")
+
+        if not self.task_name.strip():
+            def close_dlg(e):
+                self.dialog.open = False
+                self.display_view.visible = True
+                self.edit_view.visible = False
+                self.update()
+                self.page.update()
+
+            self.dialog = f.AlertDialog(
+                title=f.Text('An Error Occurred \U000026D4'),
+                content=f.Text("You entered an invalid task name."),
+                actions=[
+                    f.TextButton("Close", on_click=close_dlg),
+                ],
+                actions_alignment=f.MainAxisAlignment.END,
+                on_dismiss=lambda e: setattr(self, "dialog", None)
+            )
+
+            self.dialog.open = True
+            self.page.dialog = self.dialog
+            self.page.update()
+            backup_old_task_name = old_task_name
+            return
 
         self.display_task.label = self.wrap_label(self.task_name)
         self.display_view.visible = True
         self.edit_view.visible = False
         self.update()
 
-        # Update the task name in the database
-        task_data = db.child("tasks").child(old_task_name).get().val()
-        db.child("tasks").child(old_task_name).remove()
-        db.child("tasks").child(self.task_name).set(task_data)
-        db.child("tasks").child(self.task_name).set(task_data)
+        if old_task_name != "":
+            task_data = db.child("tasks").child(old_task_name).get().val()
+            db.child("tasks").child(old_task_name).remove()
+            db.child("tasks").child(self.task_name).set(task_data)
+
+        else:
+            task_data = db.child("tasks").child(backup_old_task_name).get().val()
+            db.child("tasks").child(backup_old_task_name).remove()
+            db.child("tasks").child(self.task_name).set(task_data)
 
     def status_changed(self, e):
         time.sleep(.5)
@@ -188,6 +220,7 @@ class Task(f.UserControl):
 class TodoApp(f.UserControl):
     def __init__(self):
         super().__init__()
+        self.error_message = None
         self.location = None
         self.todo_title = "My Tasks \U0001F4CB"
         self.no_items_prompt = f"Awaiting New Tasks \U000023F3"
@@ -213,6 +246,7 @@ class TodoApp(f.UserControl):
 
         self.new_task = f.TextField(
             on_submit=self.add_clicked,
+            max_length=500,
             expand=True,
             multiline=True,
             autofocus=True
@@ -315,11 +349,31 @@ class TodoApp(f.UserControl):
             self.add_button.visible = False
 
     def add_clicked(self, e):
-        task_name = self.new_task.value.strip()
+        task_name = self.new_task.value.replace('\n', "").replace("\r", "").strip().capitalize()
 
         if task_name:
             for chars in invalid_chars:
                 task_name = task_name.replace(chars, "")
+
+            if not task_name.strip():
+                def close_dlg(e):
+                    self.dialog.open = False
+                    self.page.update()
+
+                self.dialog = f.AlertDialog(
+                    title=f.Text('An Error Occurred \U000026D4'),
+                    content=f.Text("You entered an invalid task name. Please enter a valid name."),
+                    actions=[
+                        f.TextButton("Close", on_click=close_dlg),
+                    ],
+                    actions_alignment=f.MainAxisAlignment.END,
+                    on_dismiss=lambda e: setattr(self, "dialog", None)
+                )
+
+                self.dialog.open = True
+                self.page.dialog = self.dialog
+                self.page.update()
+                return
 
             task = Task(task_name, self.task_status_change, self.task_delete)
             self.tasks.controls.append(task)
@@ -328,7 +382,12 @@ class TodoApp(f.UserControl):
             self.update()
 
             # Adds to the database
-            db.child("tasks").child(task_name).set({"completed": False, "added_date": get_time_stamp('Created')})
+            db.child("tasks").child(task_name).set(
+                {
+                    "completed": False,
+                    "added_date": get_time_stamp('Created')
+                }
+            )
 
     def task_status_change(self, task):
         self.update()
@@ -338,6 +397,7 @@ class TodoApp(f.UserControl):
         self.update_completed_tasks_prompt_visibility()
         self.update()
 
+        print(task.task_name)
         # removes task from the database
         db.child("tasks").child(task.task_name).remove()
 
