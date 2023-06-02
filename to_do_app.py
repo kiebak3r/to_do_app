@@ -85,7 +85,7 @@ class Task(f.UserControl):
         wrapped_label = self.wrap_label(self.task_name)
 
         self.display_task = f.Checkbox(
-            value=False,
+            value=self.completed,
             label=wrapped_label,
             on_change=self.status_changed,
         )
@@ -167,6 +167,33 @@ class Task(f.UserControl):
             self.dialog = f.AlertDialog(
                 title=f.Text('An Error Occurred \U000026D4'),
                 content=f.Text("You entered an invalid task name."),
+                actions=[
+                    f.TextButton("Close", on_click=close_dlg),
+                ],
+                actions_alignment=f.MainAxisAlignment.END,
+                on_dismiss=lambda e: setattr(self, "dialog", None)
+            )
+
+            self.dialog.open = True
+            self.page.dialog = self.dialog
+            self.page.update()
+            backup_old_task_name = old_task_name
+            return
+
+        # TODO: there is a bug in this code where after the error msg its updating the wrong db entry.
+        # Check if task already exists in the database
+        task_exists = db.child("tasks").child(self.task_name).get().val()
+        if task_exists:
+            def close_dlg(e):
+                self.dialog.open = False
+                self.display_view.visible = True
+                self.edit_view.visible = False
+                self.update()
+                self.page.update()
+
+            self.dialog = f.AlertDialog(
+                title=f.Text('An Error Occurred \U000026D4'),
+                content=f.Text("Task already exists in the database."),
                 actions=[
                     f.TextButton("Close", on_click=close_dlg),
                 ],
@@ -375,6 +402,28 @@ class TodoApp(f.UserControl):
                 self.page.update()
                 return
 
+            # Check if task already exists in the database
+            task_exists = db.child("tasks").child(task_name).get().val()
+            if task_exists:
+                def close_dlg(e):
+                    self.dialog.open = False
+                    self.page.update()
+
+                self.dialog = f.AlertDialog(
+                    title=f.Text('An Error Occurred \U000026D4'),
+                    content=f.Text("Task already exists in the database."),
+                    actions=[
+                        f.TextButton("Close", on_click=close_dlg),
+                    ],
+                    actions_alignment=f.MainAxisAlignment.END,
+                    on_dismiss=lambda e: setattr(self, "dialog", None)
+                )
+
+                self.dialog.open = True
+                self.page.dialog = self.dialog
+                self.page.update()
+                return
+
             task = Task(task_name, self.task_status_change, self.task_delete)
             self.tasks.controls.append(task)
             self.new_task.value = ""
@@ -397,7 +446,6 @@ class TodoApp(f.UserControl):
         self.update_completed_tasks_prompt_visibility()
         self.update()
 
-        print(task.task_name)
         # removes task from the database
         db.child("tasks").child(task.task_name).remove()
 
@@ -458,8 +506,8 @@ class TodoApp(f.UserControl):
             try:
                 subprocess.run(['start', self.location], check=True, shell=True)
 
-            except subprocess.CalledProcessError:
-                print("Error: Failed to open the file.")
+            except subprocess.CalledProcessError as error:
+                return error
 
         self.dialog = f.AlertDialog(
             title=f.Text('Export Tasks Completed \U00002705'),
@@ -485,7 +533,7 @@ class TodoApp(f.UserControl):
             completed = task_data.get("completed", False)
             if completed:
                 completed_date = task_data.get("completed_date")
-                task = f'{task_name}\n{completed_date}\n\n'
+                task = f'{task_name}\n\U00002796 {completed_date} \U0001F4AA \n\n'
                 completed_tasks.append(task)
 
         return completed_tasks
@@ -505,6 +553,7 @@ class TodoApp(f.UserControl):
         tasks = db.child("tasks").get().val()
         if tasks:
             for task_name, task_data in tasks.items():
+                # self.display_task.value
                 task = Task(task_name, self.task_status_change, self.task_delete)
                 task.completed = task_data.get("completed", False)
                 self.tasks.controls.append(task)
