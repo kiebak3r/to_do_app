@@ -2,7 +2,6 @@ import subprocess
 import flet as f, os, time, textwrap, pyrebase, json, tempfile
 from datetime import datetime
 
-
 config = {
   "databaseURL": "https://todo-project-76b56-default-rtdb.firebaseio.com/",
   "apiKey": "AIzaSyCwsPBrk-5fwyT6f0h7geAHyf_lPuGTmAQ",
