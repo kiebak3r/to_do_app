@@ -1,9 +1,16 @@
 @echo off
 
+REM Set variable data 
 set APP=to_do_app.py
 set NAME="To Do App"
 set VERSION="1.0"
 set DESCRIPTION="To Do List"
-set CR="kiesus"
+set COPYRIGHT="kiesus"
 
-flet pack %APP% --product-name=%NAME% --product-version=%VERSION% --file-description=%DESCRIPTION% --copyright=%CR%
+REM Compile Command 
+flet pack %APP% ^
+  --product-name=%NAME% ^
+  --product-version=%VERSION% ^
+  --file-description=%DESCRIPTION% ^
+  --copyright=%COPYRIGHT%
+  
