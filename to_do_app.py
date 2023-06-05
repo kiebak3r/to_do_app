@@ -31,6 +31,7 @@ db = firebase.database()
 
 # Variables
 backup_old_task_name = ''
+edit_entry_exists = False
 invalid_chars = ['/', '.', '$', '£', '#', '[', ']']
 
 
@@ -150,6 +151,7 @@ class Task(f.UserControl):
 
     def save_clicked(self, e):
         global backup_old_task_name
+        global edit_entry_exists
         old_task_name = self.task_name.replace('\n', "").replace("\r", "").strip().capitalize()
         self.task_name = self.edit_name.value.replace('\n', "").replace("\r", "").strip().capitalize()
 
@@ -205,6 +207,7 @@ class Task(f.UserControl):
             self.page.dialog = self.dialog
             self.page.update()
             backup_old_task_name = old_task_name
+            edit_entry_exists = True
             return
 
         self.display_task.label = self.wrap_label(self.task_name)
@@ -212,15 +215,17 @@ class Task(f.UserControl):
         self.edit_view.visible = False
         self.update()
 
-        if old_task_name != "":
+        if old_task_name != "" and edit_entry_exists is False:
             task_data = db.child("tasks").child(old_task_name).get().val()
             db.child("tasks").child(old_task_name).remove()
             db.child("tasks").child(self.task_name).set(task_data)
+            edit_entry_exists = False
 
         else:
             task_data = db.child("tasks").child(backup_old_task_name).get().val()
             db.child("tasks").child(backup_old_task_name).remove()
             db.child("tasks").child(self.task_name).set(task_data)
+            edit_entry_exists = False
 
     def status_changed(self, e):
         time.sleep(.5)
