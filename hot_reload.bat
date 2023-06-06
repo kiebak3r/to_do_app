@@ -1,7 +1,7 @@
 @echo off
 
 REM Launches Hot Reloader
-python to_do_app.py ^
+flet run to_do_app.py ^
   --directory ^
   --recursive
 
