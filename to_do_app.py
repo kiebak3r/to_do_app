@@ -181,7 +181,6 @@ class Task(f.UserControl):
             backup_old_task_name = old_task_name
             return
 
-        # TODO: there is a bug in this code where after the error msg its updating the wrong db entry.
         # Check if task already exists in the database
         task_exists = db.child("tasks").child(self.task_name).get().val()
         if task_exists:
