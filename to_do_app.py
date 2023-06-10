@@ -1,28 +1,10 @@
-import subprocess
+import subprocess, json
 import flet as f, os, time, textwrap, pyrebase, json, tempfile
 from datetime import datetime
 
-config = {
-  "databaseURL": "https://todo-project-76b56-default-rtdb.firebaseio.com/",
-  "apiKey": "AIzaSyCwsPBrk-5fwyT6f0h7geAHyf_lPuGTmAQ",
-  "authDomain": "todo-project-76b56.firebaseapp.com",
-  "projectId": "todo-project-76b56",
-  "storageBucket": "todo-project-76b56.appspot.com",
-  "messagingSenderId": "768988131980",
-  "appId": "1:768988131980:web:4856fa2b961d6a529081a9",
-  "measurementId": "G-BJMNWM6GM3",
-  "type": "service_account",
-  "project_id": "todo-project-76b56",
-  "private_key_id": "23404ab220e84bec4b6aa9d436c5a30a80b533a7",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDAGM6zAH7Ylq7u\noL3UXqiMZurAeMcA//gmyYz1buB+MRsTc2Lfw4xxIro7Mc4uoKGytrD98hCdXz19\nl4yfzld8ey4eEYy8CjfL75VuU4G2uNUblKutLYV5gbg9UQ1VfymUcF1zRNNS3hVs\nqSojjqs3kYzrW1SACYNvbmiYrlYm9raOrljBQueSMuxtioUx0iNTwtPlHpkjxkSx\nLmOuvCmxZ+jzpUZ0s21FVu3CDeeZ4soZEFRwz57X9nrWzxlyEGE+Bzpst2MavMbW\nttEvH95cB8NVOliKj9sh8RaW5LCtPgE8XzBi2O+RUdC+2cRazZ0tp10o70Qr9yQI\nVH8UeAoVAgMBAAECggEADpmEEiuM4x9hWGO78blSWZNpLuuEV8bcixl2lAu91lFw\nnkk+1US1NpReBOmLjanUiEg6ykjSFZ0wskwo76yyI6pFWRsv2qBzLlXSl1yTkfnZ\nFobK3SIF0DQ5TA243qEyyDmZsfej5lst09ZFNzJyFbUt+ZBK1eKt4Yj0ZvrvCM3F\n3pGyOf6GqEj7JCtAGysHQKsKnqgxbsB60xg7irqs5vcCYECn3vzYhETIDhZ95Z8+\npP9cCPaAKdyWKEvdHlHeBuLM/r6vYKgj8KYrwTR+ZmvRph7CHf+usxa+8FPXCwO/\nkO+Vshjt+uFJAwdleKv3ppj1OLdT3BqoF+qaOOqRGQKBgQDjEEW2uQGtmV+OUxgK\njrfnRXOFAj7OXbDM2SKBnpmVlOPc/4DSvxJrm+0zslN7EtVUB6m6IhGJq6O/XXZs\n2mMi7xjdGwLQw6EV5FsH2oNxK6EDSVtqhXfSjUM8x9uQXZS/3lNpi98nHK7DlOgC\nzM9ofZKj0cKmVxmQ0Hh0UU36CQKBgQDYk8gor0eCqhesLvoZcU43omE/bEQICnMV\nEuV4Ysts4nbP0c7hLQqCfkNxAi27ZLVYjds8cicTBG1JONoHpOqQBy6vMxBhW/oe\nyFYjR7k5cRkOl2YnWhm/1104vxwkEPfzmYvjQtL5llfsoqYP9u4Sf1oP+zGs1qIx\nm93MrMICrQKBgQCtyZaR86fFJs5sME0GR5WZ/R4df0pyyGK5ZrdyXeFPC1Ybn7MJ\nmhSPKBi0qJgcap28YuEVBV5G8Iezv+UUC1I1OqrdD/9nqVNxXgYOTMCtrabezRaa\nwOykylnb+1uhcv6Wm6Nb9SIm3V0ldKLfAcL9Rp8lozZH+gInRGftHw1/gQKBgD98\nWoEqmFDCIXxUrPWGVEJUtCMOTob44TE9P8zhUPZTEDbtLrKtLFaCQqy+0b8Lz2js\n9GYspC2b75k2NBtniWa85D9xPYz8lD4vxahD3xTqhUjUspo4fDHTJL18r/gWjUh4\nKxxsO0H0g0OXjgxB+xmrATCMFsyugg7+vK7BuYFlAoGBAKFRviwbbot3iZvADTS3\nM15wt8LFFOoBegzzHCWPhL+OAvslJIKfFJfNHOh3MNTqG/BPLOj4sNlf3+EvbvLA\npmjVO08N8zaMC3+RsfRj17zzq66u8W31nLJeQKCuRlOnv7cTWJNa9W1Jo9k8jmYe\n4ZkTjJ7RYwy/fSVtWvVg79ko\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-48pm9@todo-project-76b56.iam.gserviceaccount.com",
-  "client_id": "102577566666045944352",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-48pm9%40todo-project-76b56.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
+# Load Firebase configuration from JSON file
+with open('assets/firebase.json') as config_file:
+    config = json.load(config_file)
 
 # Initialize Firebase app
 firebase = pyrebase.initialize_app(config)
@@ -92,7 +74,6 @@ class Task(f.UserControl):
 
         self.edit_name = f.TextField(
             expand=1,
-            max_length=500,
             multiline=True,
             autofocus=True
         )
@@ -276,7 +257,6 @@ class TodoApp(f.UserControl):
 
         self.new_task = f.TextField(
             on_submit=self.add_clicked,
-            max_length=500,
             expand=True,
             multiline=True,
             autofocus=True
@@ -603,22 +583,29 @@ class TodoApp(f.UserControl):
 
 
 def main(page: f.Page):
+    # Page
     page.title = "ToDo App"
     page.horizontal_alignment = "center"
     page.scroll = f.ScrollMode.ALWAYS
     page.auto_scroll = True
+
+    # UI
+    page.fonts = {
+        "Quicksand": "/fonts/Quicksand-SemiBold.ttf",
+    }
+
+    page.dark_theme = f.Theme(font_family='Quicksand')
+
     page.update()
 
-    # create application instance
-    app = TodoApp()
-
     # add application's root control to the page
+    app = TodoApp()
     page.add(app)
     app.load_tasks_from_database()
 
 
 # Web view
-# f.app(target=main, view=f.WEB_BROWSER)
+# f.app(target=main, view=f.WEB_BROWSER, assets_dir='assets')
 
 # App view
-f.app(target=main)
+f.app(target=main, assets_dir='assets')
